@@ -1,12 +1,9 @@
 package com.johnny.usuario.infrastructure.security;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.SignatureException;
-import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
 
@@ -17,11 +14,17 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
+    // tem que ser grande pro HS512
     private static final String SECRET_KEY =
             "chaveSuperSecretaParaAssinaturaJWT123456789012345678901234567890";
-    private static final long EXPIRATION_TIME = 1000 * 60 * 60; // 1 hora
 
-    // 🔹 Gera o token JWT
+    private static final long EXPIRATION_TIME = 1000 * 60 * 60; // 1h
+
+    private SecretKey getSigningKey() {
+        return Keys.hmacShaKeyFor(SECRET_KEY.getBytes(StandardCharsets.UTF_8));
+    }
+
+    // gera token com o e-mail no subject
     public String gerarToken(String email) {
         return Jwts.builder()
                 .subject(email)
@@ -31,52 +34,37 @@ public class JwtUtil {
                 .compact();
     }
 
-    // 🔹 Extrai o e-mail (subject)
+    // <<< ESTE NOME AQUI É O QUE O TEU SERVICE ESTÁ CHAMANDO
     public String extrairEmailToken(String token) {
         return getClaims(token).getSubject();
     }
 
-    // 🔹 Alias em inglês para compatibilidade com JwtRequestFilter
+    // o filtro chama assim
     public String extractUsername(String token) {
         return extrairEmailToken(token);
     }
 
-    // 🔹 Validação simples de token (sem comparar usuário)
+    // valida só se o token é bom
     public boolean validarToken(String token) {
         try {
             getClaims(token);
             return true;
-        } catch (ExpiredJwtException e) {
-            System.out.println("Token expirado: " + e.getMessage());
-        } catch (UnsupportedJwtException e) {
-            System.out.println("Token não suportado: " + e.getMessage());
-        } catch (MalformedJwtException e) {
-            System.out.println("Token malformado: " + e.getMessage());
-        } catch (SignatureException e) {
-            System.out.println("Assinatura inválida: " + e.getMessage());
-        } catch (IllegalArgumentException e) {
-            System.out.println("Token vazio ou nulo: " + e.getMessage());
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
         }
-        return false;
     }
 
-    // 🔹 Versão completa (compatível com o JwtRequestFilter)
+    // valida se o token é bom E se o e-mail dentro dele é o mesmo que o do usuário
     public boolean validarToken(String token, String username) {
-        String extractedUsername = extractUsername(token);
-        return extractedUsername.equals(username) && validarToken(token);
+        String emailDoToken = extrairEmailToken(token);
+        return emailDoToken.equals(username) && validarToken(token);
     }
 
-    // 🔹 Retorna os dados internos (claims)
     private Claims getClaims(String token) {
         return Jwts.parser()
-                .verifyWith(getSigningKey())   // usa SecretKey ✅
+                .verifyWith(getSigningKey())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-    }
-
-    // 🔹 Gera a SecretKey correta
-    private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(SECRET_KEY.getBytes(StandardCharsets.UTF_8));
     }
 }

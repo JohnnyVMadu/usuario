@@ -4,7 +4,6 @@ import com.johnny.usuario.business.UsuarioService;
 import com.johnny.usuario.business.dto.EnderecoDTO;
 import com.johnny.usuario.business.dto.TelefoneDTO;
 import com.johnny.usuario.business.dto.UsuarioDTO;
-import com.johnny.usuario.infrastructure.entity.Usuario;
 import com.johnny.usuario.infrastructure.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,21 +21,10 @@ public class UsuarioController {
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
 
-
-    // Endpoint para criar um novo usuário
     @PostMapping
     public ResponseEntity<UsuarioDTO> salvarUsuario(@RequestBody UsuarioDTO usuarioDTO) {
-        UsuarioDTO usuarioSalvo = usuarioService.salvaUsuario(usuarioDTO);
-        return ResponseEntity.ok(usuarioSalvo);
+        return ResponseEntity.ok(usuarioService.salvaUsuario(usuarioDTO));
     }
-
-    // Endpoint para verificar se um email já existe (opcional)
-    @GetMapping("/existe")
-    public ResponseEntity<Boolean> verificarEmail(@RequestParam String email) {
-        boolean existe = usuarioService.emailExisteRetorno(email);
-        return ResponseEntity.ok(existe);
-    }
-
 
     @PostMapping("/login")
     public String login(@RequestBody UsuarioDTO usuarioDTO) {
@@ -46,15 +34,16 @@ public class UsuarioController {
         return "Bearer " + jwtUtil.gerarToken(authentication.getName());
     }
 
+    // você já tinha esse com ?email=...
     @GetMapping
-    public ResponseEntity<UsuarioDTO> buscaUsuarioPorEmail(@RequestParam("email") String email){
+    public ResponseEntity<UsuarioDTO> buscaUsuarioPorEmailQuery(@RequestParam("email") String email) {
         return ResponseEntity.ok(usuarioService.buscarUsuarioPorEmail(email));
     }
 
-    @DeleteMapping("/{email}")
-    public ResponseEntity<Void> deletaUsuarioPorEmail(@PathVariable String email){
-        usuarioService.deletaUsuarioPorEmail(email);
-        return ResponseEntity.ok().build();
+    // este é o que o Postman está chamando
+    @GetMapping("/email/{email}")
+    public ResponseEntity<UsuarioDTO> buscaUsuarioPorEmailPath(@PathVariable String email) {
+        return ResponseEntity.ok(usuarioService.buscarUsuarioPorEmail(email));
     }
 
     @PutMapping
@@ -63,17 +52,27 @@ public class UsuarioController {
         return ResponseEntity.ok(usuarioService.atualizaDadosUsuario(token, dto));
     }
 
-
     @PutMapping("/endereco")
     public ResponseEntity<EnderecoDTO> atualizaEndereco(@RequestBody EnderecoDTO dto,
-                                                        @RequestParam ("id") Long id){
+                                                        @RequestParam("id") Long id) {
         return ResponseEntity.ok(usuarioService.atualizaEndereco(id, dto));
     }
 
     @PutMapping("/telefone")
     public ResponseEntity<TelefoneDTO> atualizaTelefone(@RequestBody TelefoneDTO dto,
-                                                        @RequestParam ("id") Long id){
+                                                        @RequestParam("id") Long id) {
         return ResponseEntity.ok(usuarioService.atualizaTelefone(id, dto));
     }
 
+    @PostMapping("/endereco")
+    public ResponseEntity<EnderecoDTO> cadastraEndereco(@RequestBody EnderecoDTO dto,
+                                                        @RequestHeader("Authorization") String token) {
+        return ResponseEntity.ok(usuarioService.cadastraEndereco(token, dto));
+    }
+
+    @PostMapping("/telefone")
+    public ResponseEntity<TelefoneDTO> cadastraTelefone(@RequestBody TelefoneDTO dto,
+                                                        @RequestHeader("Authorization") String token) {
+        return ResponseEntity.ok(usuarioService.cadastraTelefone(token, dto));
+    }
 }
