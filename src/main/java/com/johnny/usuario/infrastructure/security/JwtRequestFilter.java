@@ -45,7 +45,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 // Carrega os detalhes do usuário a partir do nome de usuário
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                 // Valida o token JWT
-                if (jwtUtil.validateToken(token, username)) {
+                if (jwtUtil.validarToken(token, username)) {
                     // Cria um objeto de autenticação com as informações do usuário
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                             userDetails, null, userDetails.getAuthorities());
