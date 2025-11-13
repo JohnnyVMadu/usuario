@@ -21,11 +21,10 @@ public class UsuarioController {
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
 
-    @PostMapping
-    public ResponseEntity<UsuarioDTO> salvarUsuario(@RequestBody UsuarioDTO usuarioDTO) {
-        return ResponseEntity.ok(usuarioService.salvaUsuario(usuarioDTO));
-    }
 
+    // ---------------------------
+    // LOGIN
+    // ---------------------------
     @PostMapping("/login")
     public String login(@RequestBody UsuarioDTO usuarioDTO) {
         Authentication authentication = authenticationManager.authenticate(
@@ -34,24 +33,69 @@ public class UsuarioController {
         return "Bearer " + jwtUtil.gerarToken(authentication.getName());
     }
 
-    // você já tinha esse com ?email=...
+
+    // ---------------------------
+    // POST - Criar usuário
+    // ---------------------------
+    @PostMapping
+    public ResponseEntity<UsuarioDTO> salvarUsuario(@RequestBody UsuarioDTO usuarioDTO) {
+        return ResponseEntity.ok(usuarioService.salvaUsuario(usuarioDTO));
+    }
+
+
+    // ---------------------------
+    // GET - Buscar por email (livre)
+    // ---------------------------
     @GetMapping
     public ResponseEntity<UsuarioDTO> buscaUsuarioPorEmailQuery(@RequestParam("email") String email) {
         return ResponseEntity.ok(usuarioService.buscarUsuarioPorEmail(email));
     }
 
-    // este é o que o Postman está chamando
-    @GetMapping("/email/{email}")
-    public ResponseEntity<UsuarioDTO> buscaUsuarioPorEmailPath(@PathVariable String email) {
-        return ResponseEntity.ok(usuarioService.buscarUsuarioPorEmail(email));
+
+    // ---------------------------
+    // GET /me (usuário autenticado)
+    // ---------------------------
+    @GetMapping("/me")
+    public ResponseEntity<UsuarioDTO> buscarProprio(@RequestHeader("Authorization") String token) {
+        return ResponseEntity.ok(usuarioService.buscarProprioUsuario(token));
     }
 
+
+    // ---------------------------
+    // PUT - Atualizar nome/email
+    // ---------------------------
     @PutMapping
-    public ResponseEntity<UsuarioDTO> atualizaDadoUsuario(@RequestBody UsuarioDTO dto,
-                                                          @RequestHeader("Authorization") String token) {
-        return ResponseEntity.ok(usuarioService.atualizaDadosUsuario(token, dto));
+    public ResponseEntity<UsuarioDTO> atualizarDados(@RequestHeader("Authorization") String token,
+                                                     @RequestBody UsuarioDTO dto) {
+        return ResponseEntity.ok(usuarioService.atualizarDadosBasicos(token, dto));
     }
 
+
+    // ---------------------------
+    // PATCH - Atualizar senha
+    // ---------------------------
+    @PatchMapping("/senha")
+    public ResponseEntity<Void> atualizarSenha(@RequestHeader("Authorization") String token,
+                                               @RequestBody UsuarioDTO dto) {
+        usuarioService.atualizarSenha(token, dto.getSenha());
+        return ResponseEntity.ok().build();
+    }
+
+
+    // ---------------------------
+    // DELETE - Apagar a própria conta
+    // ---------------------------
+    @DeleteMapping
+    public ResponseEntity<Void> deletarConta(@RequestHeader("Authorization") String token) {
+        usuarioService.deletarProprioUsuario(token);
+        return ResponseEntity.noContent().build();
+    }
+
+
+    // ---------------------------
+    // ENDEREÇO E TELEFONE
+    // (não mexemos)
+    // ---------------------------
     @PutMapping("/endereco")
     public ResponseEntity<EnderecoDTO> atualizaEndereco(@RequestBody EnderecoDTO dto,
                                                         @RequestParam("id") Long id) {
