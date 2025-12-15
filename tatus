@@ -1,0 +1,141 @@
+[1mdiff --git a/src/main/java/com/johnny/usuario/infrastructure/security/JwtRequestFilter.java b/src/main/java/com/johnny/usuario/infrastructure/security/JwtRequestFilter.java[m
+[1mindex c05be26..91f1545 100644[m
+[1m--- a/src/main/java/com/johnny/usuario/infrastructure/security/JwtRequestFilter.java[m
+[1m+++ b/src/main/java/com/johnny/usuario/infrastructure/security/JwtRequestFilter.java[m
+[36m@@ -9,10 +9,12 @@[m [mimport org.springframework.security.core.context.SecurityContextHolder;[m
+ import org.springframework.security.core.userdetails.UserDetails;[m
+ import org.springframework.security.core.userdetails.UserDetailsService;[m
+ import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;[m
+[32m+[m[32mimport org.springframework.stereotype.Component;[m
+ import org.springframework.web.filter.OncePerRequestFilter;[m
+ [m
+ import java.io.IOException;[m
+ [m
+[32m+[m[32m@Component[m
+ public class JwtRequestFilter extends OncePerRequestFilter {[m
+ [m
+     private final JwtUtil jwtUtil;[m
+[36m@@ -26,32 +28,59 @@[m [mpublic class JwtRequestFilter extends OncePerRequestFilter {[m
+     @Override[m
+     protected void doFilterInternal(HttpServletRequest request,[m
+                                     HttpServletResponse response,[m
+[31m-                                    FilterChain filterChain) throws ServletException, IOException {[m
+[32m+[m[32m                                    FilterChain filterChain)[m
+[32m+[m[32m            throws ServletException, IOException {[m
+ [m
+[32m+[m[32m        String path = request.getServletPath();[m
+[32m+[m
+[32m+[m[32m        // ============================================================[m
+[32m+[m[32m        // ROTAS PÚBLICAS (IGNORAM O JWT)[m
+[32m+[m[32m        // ============================================================[m
+[32m+[m[32m        if (path.equals("/usuario/login") ||[m
+[32m+[m[32m                (path.equals("/usuario") && request.getMethod().equals("POST")) ||[m
+[32m+[m[32m                (path.equals("/usuario") && request.getMethod().equals("GET")))[m
+[32m+[m[32m        {[m
+[32m+[m[32m            filterChain.doFilter(request, response);[m
+[32m+[m[32m            return;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        // ============================================================[m
+[32m+[m[32m        // PROCESSAMENTO DO TOKEN[m
+[32m+[m[32m        // ============================================================[m
+         String authHeader = request.getHeader("Authorization");[m
+[31m-        String username = null;[m
+         String token = null;[m
+[32m+[m[32m        String username = null;[m
+ [m
+         if (authHeader != null && authHeader.startsWith("Bearer ")) {[m
+             token = authHeader.substring(7);[m
+[32m+[m
+             try {[m
+                 username = jwtUtil.extractUsername(token);[m
+             } catch (Exception e) {[m
+[31m-                // token ruim → segue sem autenticar[m
+[32m+[m[32m                // Token inválido → apenas ignora[m
+             }[m
+         }[m
+ [m
+[32m+[m[32m        // ============================================================[m
+[32m+[m[32m        // SE O TOKEN É VÁLIDO → AUTENTICA NO CONTEXTO[m
+[32m+[m[32m        // ============================================================[m
+         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {[m
+[32m+[m
+             UserDetails userDetails = userDetailsService.loadUserByUsername(username);[m
+ [m
+             if (jwtUtil.validarToken(token, userDetails.getUsername())) {[m
+[32m+[m
+                 UsernamePasswordAuthenticationToken authToken =[m
+                         new UsernamePasswordAuthenticationToken([m
+                                 userDetails,[m
+                                 null,[m
+                                 userDetails.getAuthorities()[m
+                         );[m
+[31m-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));[m
+[32m+[m
+[32m+[m[32m                authToken.setDetails([m
+[32m+[m[32m                        new WebAuthenticationDetailsSource().buildDetails(request)[m
+[32m+[m[32m                );[m
+[32m+[m
+                 SecurityContextHolder.getContext().setAuthentication(authToken);[m
+             }[m
+         }[m
+[1mdiff --git a/src/main/java/com/johnny/usuario/infrastructure/security/SecurityConfig.java b/src/main/java/com/johnny/usuario/infrastructure/security/SecurityConfig.java[m
+[1mindex 0686b16..b25ccd7 100644[m
+[1m--- a/src/main/java/com/johnny/usuario/infrastructure/security/SecurityConfig.java[m
+[1m+++ b/src/main/java/com/johnny/usuario/infrastructure/security/SecurityConfig.java[m
+[36m@@ -1,47 +1,51 @@[m
+ package com.johnny.usuario.infrastructure.security;[m
+ [m
+[32m+[m[32mimport lombok.RequiredArgsConstructor;[m
+ import org.springframework.context.annotation.Bean;[m
+ import org.springframework.context.annotation.Configuration;[m
+ import org.springframework.http.HttpMethod;[m
+ import org.springframework.security.authentication.AuthenticationManager;[m
+ import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;[m
+[31m-import org.springframework.security.config.annotation.web.builders.HttpSecurity;[m
+[31m-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;[m
+[31m-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;[m
+ import org.springframework.security.config.http.SessionCreationPolicy;[m
+[31m-import org.springframework.security.core.userdetails.UserDetailsService;[m
+[31m-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;[m
+[31m-import org.springframework.security.crypto.password.PasswordEncoder;[m
+ import org.springframework.security.web.SecurityFilterChain;[m
+ import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;[m
+[32m+[m[32mimport org.springframework.security.config.annotation.web.builders.HttpSecurity;[m
+[32m+[m[32mimport org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;[m
+[32m+[m[32mimport org.springframework.security.crypto.password.PasswordEncoder;[m
+ [m
+ @Configuration[m
+[31m-@EnableWebSecurity[m
+[32m+[m[32m@RequiredArgsConstructor[m
+ public class SecurityConfig {[m
+ [m
+[31m-    private final JwtUtil jwtUtil;[m
+[31m-    private final UserDetailsService userDetailsService;[m
+[31m-[m
+[31m-    public SecurityConfig(JwtUtil jwtUtil, UserDetailsService userDetailsService) {[m
+[31m-        this.jwtUtil = jwtUtil;[m
+[31m-        this.userDetailsService = userDetailsService;[m
+[31m-    }[m
+[32m+[m[32m    private final JwtRequestFilter jwtRequestFilter;[m
+[32m+[m[32m    private final UserDetailsServiceImpl userDetailsService;[m
+ [m
+     @Bean[m
+     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {[m
+[31m-        JwtRequestFilter jwtRequestFilter = new JwtRequestFilter(jwtUtil, userDetailsService);[m
+ [m
+         http[m
+[31m-                .csrf(AbstractHttpConfigurer::disable)[m
+[31m-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))[m
+[32m+[m[32m                .csrf(csrf -> csrf.disable())[m
+                 .authorizeHttpRequests(auth -> auth[m
+[31m-                        .requestMatchers("/usuario/login").permitAll()[m
+[32m+[m
+[32m+[m[32m                        // ENDPOINTS LIBERADOS[m
+                         .requestMatchers(HttpMethod.POST, "/usuario").permitAll()[m
+[31m-                        // este é o que você está CHAMANDO no Postman[m
+[31m-                        .requestMatchers(HttpMethod.GET, "/usuario/email/**").authenticated()[m
+[32m+[m[32m                        .requestMatchers(HttpMethod.POST, "/usuario/login").permitAll()[m
+[32m+[m
+[32m+[m[32m                        // SWAGGER LIBERADO[m
+[32m+[m[32m          
