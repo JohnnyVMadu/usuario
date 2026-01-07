@@ -9,10 +9,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+@Component
 public class JwtRequestFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
@@ -26,32 +28,59 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
+                                    FilterChain filterChain)
+            throws ServletException, IOException {
 
+        String path = request.getServletPath();
+
+        // ============================================================
+        // ROTAS PÚBLICAS (IGNORAM O JWT)
+        // ============================================================
+        if (path.equals("/usuario/login") ||
+                (path.equals("/usuario") && request.getMethod().equals("POST")) ||
+                (path.equals("/usuario") && request.getMethod().equals("GET")))
+        {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // ============================================================
+        // PROCESSAMENTO DO TOKEN
+        // ============================================================
         String authHeader = request.getHeader("Authorization");
-        String username = null;
         String token = null;
+        String username = null;
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
+
             try {
                 username = jwtUtil.extractUsername(token);
             } catch (Exception e) {
-                // token ruim → segue sem autenticar
+                // Token inválido → apenas ignora
             }
         }
 
+        // ============================================================
+        // SE O TOKEN É VÁLIDO → AUTENTICA NO CONTEXTO
+        // ============================================================
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
             if (jwtUtil.validarToken(token, userDetails.getUsername())) {
+
                 UsernamePasswordAuthenticationToken authToken =
                         new UsernamePasswordAuthenticationToken(
                                 userDetails,
                                 null,
                                 userDetails.getAuthorities()
                         );
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                authToken.setDetails(
+                        new WebAuthenticationDetailsSource().buildDetails(request)
+                );
+
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         }
